@@ -1,43 +1,36 @@
-import { myProvider } from '@/lib/ai/providers';
-import { createDocumentHandler } from '@/lib/artifacts/server';
-import { experimental_generateImage } from 'ai';
+import { CreateDocumentCallbackProps, UpdateDocumentCallbackProps, createDocumentHandler } from '@/lib/artifacts/server';
 
-export const imageDocumentHandler = createDocumentHandler<'image'>({
+/**
+ * Image document handler for the chatbot
+ */
+export const imageDocumentHandler = createDocumentHandler({
   kind: 'image',
-  onCreateDocument: async ({ title, dataStream }) => {
-    let draftContent = '';
-
-    const { image } = await experimental_generateImage({
-      model: myProvider.imageModel('small-model'),
-      prompt: title,
-      n: 1,
-    });
-
-    draftContent = image.base64;
-
+  onCreateDocument: async ({ id, title, dataStream }: CreateDocumentCallbackProps) => {
     dataStream.writeData({
-      type: 'image-delta',
-      content: image.base64,
+      type: 'tool-call',
+      toolCall: {
+        id,
+        type: 'create-document',
+        status: 'running',
+        name: 'Image Document',
+      },
     });
 
-    return draftContent;
+    // Return a placeholder for image content (base64 or reference)
+    return '{"placeholder": "image data would go here"}';
   },
-  onUpdateDocument: async ({ description, dataStream }) => {
-    let draftContent = '';
-
-    const { image } = await experimental_generateImage({
-      model: myProvider.imageModel('small-model'),
-      prompt: description,
-      n: 1,
-    });
-
-    draftContent = image.base64;
-
+  onUpdateDocument: async ({ document, description, dataStream }: UpdateDocumentCallbackProps) => {
     dataStream.writeData({
-      type: 'image-delta',
-      content: image.base64,
+      type: 'tool-call',
+      toolCall: {
+        id: document.id,
+        type: 'update-document',
+        status: 'running',
+        name: 'Image Document',
+      },
     });
 
-    return draftContent;
+    // In a real implementation, this would modify the image based on the description
+    return document.content || '{"placeholder": "updated image data would go here"}';
   },
 });

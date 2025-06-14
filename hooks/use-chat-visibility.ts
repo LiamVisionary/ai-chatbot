@@ -3,12 +3,12 @@
 import { useMemo } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { unstable_serialize } from 'swr/infinite';
-import { updateChatVisibility } from '@/app/(chat)/actions';
+import { updateChatVisibility } from '@/app/features/(chat)/actions';
 import {
   getChatHistoryPaginationKey,
   type ChatHistory,
-} from '@/components/sidebar-history';
-import type { VisibilityType } from '@/components/visibility-selector';
+} from '@/app/shared/components/sidebar-history';
+import type { VisibilityType } from '@/app/shared/components/visibility-selector';
 
 export function useChatVisibility({
   chatId,

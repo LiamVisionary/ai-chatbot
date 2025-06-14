@@ -1,84 +1,87 @@
 'use client';
 
-import { UIMessage, Attachment } from 'ai';
-import { Vote } from '@/lib/db/schema';
-import { UseChatHelpers } from '@ai-sdk/react';
-import { VisibilityType } from '@/components/visibility-selector';
+import { Attachment } from 'ai';
 import { createContext, ReactNode, useContext, useState } from 'react';
+import { ChatContextProps, ChatProviderInitialValues } from '@/lib/types';
 
-interface ChatContextProps {
-  // Chat state
-  chatId: string;
-  messages: UIMessage[];
-  setMessages: UseChatHelpers['setMessages'];
-  input: string;
-  setInput: UseChatHelpers['setInput'];
-  status: UseChatHelpers['status'];
-  
-  // Chat actions
-  handleSubmit: UseChatHelpers['handleSubmit'];
-  append: UseChatHelpers['append'];
-  reload: UseChatHelpers['reload'];
-  stop: () => void;
-  
-  // Attachments 
-  attachments: Attachment[];
-  setAttachments: (attachments: Attachment[] | ((current: Attachment[]) => Attachment[])) => void;
-  
-  // Chat configuration
-  isReadonly: boolean;
-  initialChatModel: string;
-  selectedVisibilityType: VisibilityType;
-  
-  // Chat related data
-  votes: Vote[] | undefined;
-}
-
+/**
+ * Context for managing chat state and operations
+ * This context provides shared state and functionality for chat components
+ */
 const ChatContext = createContext<ChatContextProps | undefined>(undefined);
 
+/**
+ * Provider component for chat functionality
+ * Distributes chat state and operations to all children components
+ * 
+ * @param children - React child components
+ * @param initialValues - Initial values for chat session
+ */
 export function ChatProvider({ 
   children,
   initialValues
 }: { 
   children: ReactNode;
-  initialValues: {
-    chatId: string;
-    initialMessages: UIMessage[];
-    initialChatModel: string;
-    initialVisibilityType: VisibilityType;
-    isReadonly: boolean;
-    chatHelpers: Pick<UseChatHelpers, 'messages' | 'setMessages' | 'input' | 'setInput' | 'status' | 'handleSubmit' | 'append' | 'reload' | 'stop'>;
-    votes?: Vote[];
-  }
+  initialValues: ChatProviderInitialValues
 }) {
+  // Local state for attachments
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const { chatId, initialChatModel, initialVisibilityType, isReadonly, votes } = initialValues;
-  const { messages, setMessages, input, setInput, status, handleSubmit, append, reload, stop } = initialValues.chatHelpers;
+  
+  // Extract values from initial values
+  const { 
+    chatId, 
+    initialChatModel, 
+    initialVisibilityType, 
+    isReadonly, 
+    votes 
+  } = initialValues;
+  
+  // Extract chat helper functions
+  const { 
+    messages, 
+    setMessages, 
+    input, 
+    setInput, 
+    status, 
+    handleSubmit, 
+    append, 
+    reload, 
+    stop 
+  } = initialValues.chatHelpers;
+
+  // Combine all values into context
+  const contextValue: ChatContextProps = {
+    chatId,
+    messages,
+    setMessages,
+    input,
+    setInput,
+    status,
+    handleSubmit,
+    append,
+    reload,
+    stop,
+    attachments,
+    setAttachments,
+    isReadonly,
+    initialChatModel,
+    selectedVisibilityType: initialVisibilityType,
+    votes
+  };
 
   return (
-    <ChatContext.Provider value={{
-      chatId,
-      messages,
-      setMessages,
-      input,
-      setInput,
-      status,
-      handleSubmit,
-      append,
-      reload,
-      stop,
-      attachments,
-      setAttachments,
-      isReadonly,
-      initialChatModel,
-      selectedVisibilityType: initialVisibilityType,
-      votes
-    }}>
+    <ChatContext.Provider value={contextValue}>
       {children}
     </ChatContext.Provider>
   );
 }
 
+/**
+ * Hook to access chat context
+ * Throws an error if used outside of a ChatProvider
+ * 
+ * @returns ChatContextProps - Chat state and operations
+ */
 export const useChatContext = () => {
   const context = useContext(ChatContext);
   if (context === undefined) {

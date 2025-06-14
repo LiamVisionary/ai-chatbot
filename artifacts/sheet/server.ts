@@ -1,78 +1,48 @@
-import { myProvider } from '@/lib/ai/providers';
-import { sheetPrompt, updateDocumentPrompt } from '@/lib/ai/prompts';
-import { createDocumentHandler } from '@/lib/artifacts/server';
-import { streamObject } from 'ai';
-import { z } from 'zod';
+import { CreateDocumentCallbackProps, UpdateDocumentCallbackProps, createDocumentHandler } from '@/lib/artifacts/server';
 
-export const sheetDocumentHandler = createDocumentHandler<'sheet'>({
+/**
+ * Sheet document handler for the chatbot
+ */
+export const sheetDocumentHandler = createDocumentHandler({
   kind: 'sheet',
-  onCreateDocument: async ({ title, dataStream }) => {
-    let draftContent = '';
-
-    const { fullStream } = streamObject({
-      model: myProvider.languageModel('artifact-model'),
-      system: sheetPrompt,
-      prompt: title,
-      schema: z.object({
-        csv: z.string().describe('CSV data'),
-      }),
-    });
-
-    for await (const delta of fullStream) {
-      const { type } = delta;
-
-      if (type === 'object') {
-        const { object } = delta;
-        const { csv } = object;
-
-        if (csv) {
-          dataStream.writeData({
-            type: 'sheet-delta',
-            content: csv,
-          });
-
-          draftContent = csv;
-        }
-      }
-    }
-
+  onCreateDocument: async ({ id, title, dataStream }: CreateDocumentCallbackProps) => {
     dataStream.writeData({
-      type: 'sheet-delta',
-      content: draftContent,
+      type: 'tool-call',
+      toolCall: {
+        id,
+        type: 'create-document',
+        status: 'running',
+        name: 'Sheet Document',
+      },
     });
 
-    return draftContent;
+    // Return some placeholder sheet content
+    return JSON.stringify({
+      headers: ['Column A', 'Column B', 'Column C'],
+      rows: [
+        ['Data 1', 'Data 2', 'Data 3'],
+        ['Data 4', 'Data 5', 'Data 6'],
+      ]
+    });
   },
-  onUpdateDocument: async ({ document, description, dataStream }) => {
-    let draftContent = '';
-
-    const { fullStream } = streamObject({
-      model: myProvider.languageModel('artifact-model'),
-      system: updateDocumentPrompt(document.content, 'sheet'),
-      prompt: description,
-      schema: z.object({
-        csv: z.string(),
-      }),
+  onUpdateDocument: async ({ document, description, dataStream }: UpdateDocumentCallbackProps) => {
+    dataStream.writeData({
+      type: 'tool-call',
+      toolCall: {
+        id: document.id,
+        type: 'update-document',
+        status: 'running',
+        name: 'Sheet Document',
+      },
     });
 
-    for await (const delta of fullStream) {
-      const { type } = delta;
-
-      if (type === 'object') {
-        const { object } = delta;
-        const { csv } = object;
-
-        if (csv) {
-          dataStream.writeData({
-            type: 'sheet-delta',
-            content: csv,
-          });
-
-          draftContent = csv;
-        }
-      }
-    }
-
-    return draftContent;
+    // In a real implementation, this would update the sheet based on the description
+    return document.content || JSON.stringify({
+      headers: ['Column A', 'Column B', 'Column C'],
+      rows: [
+        ['Updated 1', 'Updated 2', 'Updated 3'],
+        ['Updated 4', 'Updated 5', 'Updated 6'],
+      ]
+    });
   },
 });

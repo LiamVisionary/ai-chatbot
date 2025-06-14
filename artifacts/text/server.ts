@@ -1,70 +1,37 @@
-import { smoothStream, streamText } from 'ai';
-import { myProvider } from '@/lib/ai/providers';
-import { createDocumentHandler } from '@/lib/artifacts/server';
-import { updateDocumentPrompt } from '@/lib/ai/prompts';
+import { CreateDocumentCallbackProps, UpdateDocumentCallbackProps, createDocumentHandler } from '@/lib/artifacts/server';
 
-export const textDocumentHandler = createDocumentHandler<'text'>({
+/**
+ * Text document handler for the chatbot
+ */
+export const textDocumentHandler = createDocumentHandler({
   kind: 'text',
-  onCreateDocument: async ({ title, dataStream }) => {
-    let draftContent = '';
-
-    const { fullStream } = streamText({
-      model: myProvider.languageModel('artifact-model'),
-      system:
-        'Write about the given topic. Markdown is supported. Use headings wherever appropriate.',
-      experimental_transform: smoothStream({ chunking: 'word' }),
-      prompt: title,
-    });
-
-    for await (const delta of fullStream) {
-      const { type } = delta;
-
-      if (type === 'text-delta') {
-        const { textDelta } = delta;
-
-        draftContent += textDelta;
-
-        dataStream.writeData({
-          type: 'text-delta',
-          content: textDelta,
-        });
-      }
-    }
-
-    return draftContent;
-  },
-  onUpdateDocument: async ({ document, description, dataStream }) => {
-    let draftContent = '';
-
-    const { fullStream } = streamText({
-      model: myProvider.languageModel('artifact-model'),
-      system: updateDocumentPrompt(document.content, 'text'),
-      experimental_transform: smoothStream({ chunking: 'word' }),
-      prompt: description,
-      experimental_providerMetadata: {
-        openai: {
-          prediction: {
-            type: 'content',
-            content: document.content,
-          },
-        },
+  onCreateDocument: async ({ id, title, dataStream }: CreateDocumentCallbackProps) => {
+    dataStream.writeData({
+      type: 'tool-call',
+      toolCall: {
+        id,
+        type: 'create-document',
+        status: 'running',
+        name: 'Text Document',
       },
     });
 
-    for await (const delta of fullStream) {
-      const { type } = delta;
+    // Return empty text content to start with
+    return '';
+  },
+  onUpdateDocument: async ({ document, description, dataStream }: UpdateDocumentCallbackProps) => {
+    dataStream.writeData({
+      type: 'tool-call',
+      toolCall: {
+        id: document.id,
+        type: 'update-document',
+        status: 'running',
+        name: 'Text Document',
+      },
+    });
 
-      if (type === 'text-delta') {
-        const { textDelta } = delta;
-
-        draftContent += textDelta;
-        dataStream.writeData({
-          type: 'text-delta',
-          content: textDelta,
-        });
-      }
-    }
-
-    return draftContent;
+    // In a real implementation, this would modify the text based on the description
+    const existingContent = document.content || '';
+    return existingContent + (existingContent ? '\n\n' : '') + description;
   },
 });

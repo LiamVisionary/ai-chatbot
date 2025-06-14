@@ -1,73 +1,36 @@
-import { z } from 'zod';
-import { streamObject } from 'ai';
-import { myProvider } from '@/lib/ai/providers';
-import { codePrompt, updateDocumentPrompt } from '@/lib/ai/prompts';
-import { createDocumentHandler } from '@/lib/artifacts/server';
+import { CreateDocumentCallbackProps, UpdateDocumentCallbackProps, createDocumentHandler } from '@/lib/artifacts/server';
 
-export const codeDocumentHandler = createDocumentHandler<'code'>({
+/**
+ * Code document handler for the chatbot
+ */
+export const codeDocumentHandler = createDocumentHandler({
   kind: 'code',
-  onCreateDocument: async ({ title, dataStream }) => {
-    let draftContent = '';
-
-    const { fullStream } = streamObject({
-      model: myProvider.languageModel('artifact-model'),
-      system: codePrompt,
-      prompt: title,
-      schema: z.object({
-        code: z.string(),
-      }),
+  onCreateDocument: async ({ id, title, dataStream }: CreateDocumentCallbackProps) => {
+    dataStream.writeData({
+      type: 'tool-call',
+      toolCall: {
+        id,
+        type: 'create-document',
+        status: 'running',
+        name: 'Code Document',
+      },
     });
 
-    for await (const delta of fullStream) {
-      const { type } = delta;
-
-      if (type === 'object') {
-        const { object } = delta;
-        const { code } = object;
-
-        if (code) {
-          dataStream.writeData({
-            type: 'code-delta',
-            content: code ?? '',
-          });
-
-          draftContent = code;
-        }
-      }
-    }
-
-    return draftContent;
+    // Return some placeholder code content
+    return '// Add your code here';
   },
-  onUpdateDocument: async ({ document, description, dataStream }) => {
-    let draftContent = '';
-
-    const { fullStream } = streamObject({
-      model: myProvider.languageModel('artifact-model'),
-      system: updateDocumentPrompt(document.content, 'code'),
-      prompt: description,
-      schema: z.object({
-        code: z.string(),
-      }),
+  onUpdateDocument: async ({ document, description, dataStream }: UpdateDocumentCallbackProps) => {
+    dataStream.writeData({
+      type: 'tool-call',
+      toolCall: {
+        id: document.id,
+        type: 'update-document',
+        status: 'running',
+        name: 'Code Document',
+      },
     });
 
-    for await (const delta of fullStream) {
-      const { type } = delta;
-
-      if (type === 'object') {
-        const { object } = delta;
-        const { code } = object;
-
-        if (code) {
-          dataStream.writeData({
-            type: 'code-delta',
-            content: code ?? '',
-          });
-
-          draftContent = code;
-        }
-      }
-    }
-
-    return draftContent;
+    // In a real implementation, this would modify the code based on the description
+    return document.content || '// Updated code';
   },
 });
